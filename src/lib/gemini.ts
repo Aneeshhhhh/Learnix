@@ -11,7 +11,7 @@ if (!apiKey) {
 const genAI = new GoogleGenerativeAI(apiKey || "");
 
 // Use the correct model name for the Gemini API
-const DEFAULT_MODEL = "gemini-1.5-flash-latest";
+const DEFAULT_MODEL = "gemini-2.5-flash";
 
 export const geminiClient = {
   async generateText(prompt: string, model: string = DEFAULT_MODEL) {
