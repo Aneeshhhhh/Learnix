@@ -9,6 +9,9 @@ import {
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
+// Temporary types for development
+// type User = any;
+
 interface AuthContextType {
   currentUser: User | null;
   userData: any | null; // Stores the profile data (role, interests, etc.)
