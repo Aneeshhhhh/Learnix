@@ -66,11 +66,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
 			setCurrentUser(user);
 			if (user) {
-				// Fetch user profile from Firestore
-				const docRef = doc(db, "users", user.uid);
-				const docSnap = await getDoc(docRef);
-				if (docSnap.exists()) {
-					setUserData(docSnap.data());
+				// Fetch user profile from Firestore (optional - won't block sign-in)
+				try {
+					const docRef = doc(db, "users", user.uid);
+					const docSnap = await getDoc(docRef);
+					if (docSnap.exists()) {
+						setUserData(docSnap.data());
+					} else {
+						setUserData(null);
+					}
+				} catch (error) {
+					console.warn("Could not fetch user data from Firestore:", error);
+					setUserData(null);
 				}
 			} else {
 				setUserData(null);
