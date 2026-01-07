@@ -1,22 +1,7 @@
-// import { 
-//   createUserWithEmailAndPassword, 
-//   signInWithEmailAndPassword, 
-//   signOut, 
-//   onAuthStateChanged, 
-//   User 
-// } from "firebase/auth";
-// import { doc, getDoc, setDoc } from "firebase/firestore";
-// import { auth, db } from "@/lib/firebase";
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import {
-	createUserWithEmailAndPassword,
-	signInWithEmailAndPassword,
-	signOut,
-	onAuthStateChanged,
-	User,
-} from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import type { User } from "firebase/auth";
+// Firebase has been temporarily disabled. This context provides a local mock
+// implementation of auth so the app can proceed beyond signup without Firestore.
 
 interface AuthContextType {
 	currentUser: User | null;
@@ -40,52 +25,70 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 	const [userData, setUserData] = useState<any | null>(null);
 	const [loading, setLoading] = useState(true);
 
-	// Login function
-	const login = async (email: string, pass: string) => {
-		await signInWithEmailAndPassword(auth, email, pass);
+	// Helpers for mock auth
+	const makeUid = (email: string) => {
+		try {
+			return btoa(email).replace(/=+$/, "");
+		} catch {
+			// Fallback pseudo UID
+			return `uid_${Math.random().toString(36).slice(2, 10)}`;
+		}
 	};
 
-	// Signup function: Creates Auth user AND Firestore document
-	const signup = async (email: string, pass: string, additionalData: any) => {
-		const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-		const user = userCredential.user;
-
-		// Save extra profile details to Firestore
-		await setDoc(doc(db, "users", user.uid), {
-			email,
-			...additionalData,
-			createdAt: new Date().toISOString(),
-		});
-
-		setUserData(additionalData);
+	const saveSession = (email: string, profile: any) => {
+		const uid = makeUid(email);
+		const session = { uid, email };
+		try {
+			localStorage.setItem("mockAuth:session", JSON.stringify(session));
+			localStorage.setItem("mockAuth:userData", JSON.stringify({ email, ...profile }));
+		} catch {}
+		// Cast to firebase User for compatibility in the app
+		const mockUser = { uid, email } as unknown as User;
+		setCurrentUser(mockUser);
+		setUserData({ email, ...profile });
 	};
 
-	const logout = () => signOut(auth);
+	// Mock login: accept provided credentials, restore any stored profile
+	const login = async (email: string, _pass: string) => {
+		const stored = localStorage.getItem("mockAuth:userData");
+		let profile: any = { email };
+		if (stored) {
+			try {
+				const parsed = JSON.parse(stored);
+				if (parsed && parsed.email === email) profile = parsed;
+			} catch {}
+		}
+		saveSession(email, profile);
+	};
+
+	// Mock signup: store profile in localStorage and mark as logged in
+	const signup = async (email: string, _pass: string, additionalData: any) => {
+		saveSession(email, additionalData);
+	};
+
+	const logout = async () => {
+		try {
+			localStorage.removeItem("mockAuth:session");
+		} catch {}
+		setCurrentUser(null);
+		setUserData(null);
+	};
 
 	useEffect(() => {
-		const unsubscribe = onAuthStateChanged(auth, async (user) => {
-			setCurrentUser(user);
-			if (user) {
-				// Fetch user profile from Firestore (optional - won't block sign-in)
-				try {
-					const docRef = doc(db, "users", user.uid);
-					const docSnap = await getDoc(docRef);
-					if (docSnap.exists()) {
-						setUserData(docSnap.data());
-					} else {
-						setUserData(null);
-					}
-				} catch (error) {
-					console.warn("Could not fetch user data from Firestore:", error);
-					setUserData(null);
-				}
-			} else {
-				setUserData(null);
+		// Restore mock session if present
+		try {
+			const storedSession = localStorage.getItem("mockAuth:session");
+			const storedUserData = localStorage.getItem("mockAuth:userData");
+			if (storedSession) {
+				const sess = JSON.parse(storedSession);
+				const mockUser = { uid: sess.uid, email: sess.email } as unknown as User;
+				setCurrentUser(mockUser);
 			}
-			setLoading(false);
-		});
-
-		return unsubscribe;
+			if (storedUserData) {
+				setUserData(JSON.parse(storedUserData));
+			}
+		} catch {}
+		setLoading(false);
 	}, []);
 
 	return (
